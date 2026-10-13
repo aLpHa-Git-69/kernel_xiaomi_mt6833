@@ -19,6 +19,7 @@ obj-$(CONFIG_DRM_PANEL_SAMSUNG_AMS601NN04_CMD) += panel-samsung-ams601nn04-cmd.o
 # BSP.lcm - 2020.11.19 - start
 obj-$(CONFIG_DRM_PANEL_NT36672D_TIANMA_VDO) += panel-nt36672d-tianma-fhdp-dsi-vdo-90hz.o
 obj-$(CONFIG_DRM_PANEL_NT36672C_TIANMA_VDO) += panel-nt36672c-tianma-fhdp-dsi-vdo-90hz.o
+obj-$(CONFIG_DRM_PANEL_FT8722_TIANMA_VDO) += panel-ft8722-tianma-fhdp-dsi-vdo-90hz.o
 obj-$(CONFIG_DRM_PANEL_NT36672C_TRULY_VDO) += panel-nt36672c-truly-fhdp-dsi-vdo-90hz.o
 obj-$(CONFIG_DRM_PANEL_NT35695B_AUO_VDO) += panel-nt35695b-auo-vdo.o
 # BSP.lcm - 2020.11.19 - end

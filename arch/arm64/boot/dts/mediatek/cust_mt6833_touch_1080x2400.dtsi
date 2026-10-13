@@ -13,6 +13,18 @@
  */
 /* TOUCH start */
 &spi4 {
+	focaltech@0 {
+			compatible = "focaltech,fts";
+			reg = <1>;
+			status = "ok";
+			spi-max-frequency = <6000000>;
+			interrupt-parent = <&pio>;
+			interrupts = <1 0x2>;
+			focaltech,reset-gpio =  <&pio 15 0x00>;
+			focaltech,irq-gpio = <&pio 14 0x2001>;
+			focaltech,max-touch-number = <10>;
+			focaltech,display-coords =  <0 0 1079 2399>;
+		};
 	novatek@0 {
 		compatible = "novatek,NVT-ts-spi";
 		reg = <0>; //Same as CS ID

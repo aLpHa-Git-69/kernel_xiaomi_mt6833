@@ -56,6 +56,11 @@
 
 #include <asm/arch_timer.h>
 
+/* camellia FTS panels need these */
+int real_refresh = 60;
+int temp_refresh = 60;
+bool esd_flag = false;
+
 #define DSI_START 0x00
 #define SLEEPOUT_START BIT(2)
 #define VM_CMD_START BIT(16)
