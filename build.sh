@@ -63,6 +63,7 @@ mkdir -p out
 make O=out ARCH=arm64 "$DEFCONFIG"
 
 echo -e "\nStarting compilation...\n"
+# uname 5.10 spoof for bpfloader/netbpfload/netd lives in kernel/sys.c
 
 if \
 	make -j$(nproc --all) O=out \
