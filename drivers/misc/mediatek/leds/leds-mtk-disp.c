@@ -18,6 +18,8 @@
 #include <linux/workqueue.h>
 
 #include "leds-mtk-disp.h"
+#include <linux/kobject.h>
+#include <linux/sysfs.h>
 
 /* BSP.LCM - 2020.11.25 - modify to set brightness */
 #ifdef CONFIG_LM3697_SUPPORT
@@ -287,6 +289,96 @@ led_dat->brightness = brightness;
 
 }
 
+/* OPlus brightness fix */
+static struct kobject *oplus_touchpanel_kobj;
+static struct kobject *oplus_display_kobj;
+
+static int oplus_backlight_cover(int value)
+{
+	int input_min = 222, input_max = 8191;
+	int input_span = 7969, out_span = 2046;
+	int output_min = 1, output_max = 2047;
+
+	if (value <= 0)
+		return 0;
+	if (value <= input_min)
+		return output_min;
+	if (value >= input_max)
+		return output_max;
+
+	return (((value - input_min) * out_span * 2 + input_span) / (input_span * 2)) + output_min;
+}
+
+static ssize_t oplus_backlight_show(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	int index = getLedDespIndex("lcd-backlight");
+	struct mtk_led_data *led_dat;
+
+	if (index >= 0 && leds_info && leds_info->leds[index]) {
+		led_dat = container_of(leds_info->leds[index],
+				       struct mtk_led_data, desp);
+		return sprintf(buf, "%d\n", led_dat->brightness);
+	}
+	return sprintf(buf, "0\n");
+}
+
+static ssize_t oplus_backlight_store(struct kobject *kobj,
+				     struct kobj_attribute *attr,
+				     const char *buf, size_t count)
+{
+	int value = 0;
+	int index;
+	struct mtk_led_data *led_dat;
+
+	if (sscanf(buf, "%d", &value) != 1)
+		return -EINVAL;
+
+	value = oplus_backlight_cover(value);
+
+	index = getLedDespIndex("lcd-backlight");
+	if (index >= 0 && leds_info && leds_info->leds[index]) {
+		led_dat = container_of(leds_info->leds[index],
+				       struct mtk_led_data, desp);
+		led_dat->conf.cdev.brightness = value;
+		led_level_set(&led_dat->conf.cdev, value);
+	}
+
+	return count;
+}
+
+static struct kobj_attribute oplus_backlight_attr =
+	__ATTR(oplus_backlight, 0664, oplus_backlight_show, oplus_backlight_store);
+
+static struct kobj_attribute oplus_panel_brightness_attr =
+	__ATTR(write_panel_brightness, 0664, oplus_backlight_show, oplus_backlight_store);
+
+static ssize_t dev_oplus_backlight_show(struct device *dev,
+					struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+	return sprintf(buf, "%d\n", led_cdev->brightness);
+}
+
+static ssize_t dev_oplus_backlight_store(struct device *dev,
+					 struct device_attribute *attr,
+					 const char *buf, size_t count)
+{
+	int value = 0;
+	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	if (sscanf(buf, "%d", &value) != 1)
+		return -EINVAL;
+
+	value = oplus_backlight_cover(value);
+	led_cdev->brightness = value;
+	led_level_set(led_cdev, value);
+
+	return count;
+}
+
+static DEVICE_ATTR(oplus_backlight, 0664, dev_oplus_backlight_show, dev_oplus_backlight_store);
+
 static int led_data_init(struct device *dev, struct mtk_led_data *s_led)
 {
 	int ret;
@@ -302,6 +394,11 @@ static int led_data_init(struct device *dev, struct mtk_led_data *s_led)
 		return ret;
 	}
 	pr_debug("%s devm_led_classdev_register ok! ", s_led->conf.cdev.name);
+
+	if (!strcmp(s_led->conf.cdev.name, "lcd-backlight")) {
+		if (device_create_file(s_led->conf.cdev.dev, &dev_attr_oplus_backlight))
+			pr_err("failed to create oplus_backlight dev attr\n");
+	}
 
 	led_level_set(&s_led->conf.cdev, s_led->conf.cdev.brightness);
 	return 0;
@@ -426,6 +523,16 @@ static int mtk_leds_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, m_leds);
 	m_leds->dev = dev;
 
+	oplus_touchpanel_kobj = kobject_create_and_add("touchpanel", NULL);
+	if (oplus_touchpanel_kobj) {
+		if (sysfs_create_file(oplus_touchpanel_kobj, &oplus_backlight_attr.attr))
+			pr_err("Failed to create oplus_backlight in touchpanel\n");
+	}
+	oplus_display_kobj = kobject_create_and_add("oplus_display", kernel_kobj);
+	if (oplus_display_kobj) {
+		if (sysfs_create_file(oplus_display_kobj, &oplus_panel_brightness_attr.attr))
+			pr_err("Failed to create write_panel_brightness in oplus_display\n");
+	}
 
 	return ret;
  err:
@@ -446,6 +553,17 @@ static int mtk_leds_remove(struct platform_device *pdev)
 		led_classdev_unregister(&m_leds->leds[i].conf.cdev);
 		m_leds->leds[i].parent = NULL;
 	}
+	if (oplus_touchpanel_kobj) {
+		sysfs_remove_file(oplus_touchpanel_kobj, &oplus_backlight_attr.attr);
+		kobject_put(oplus_touchpanel_kobj);
+		oplus_touchpanel_kobj = NULL;
+	}
+	if (oplus_display_kobj) {
+		sysfs_remove_file(oplus_display_kobj, &oplus_panel_brightness_attr.attr);
+		kobject_put(oplus_display_kobj);
+		oplus_display_kobj = NULL;
+	}
+
 	kfree(m_leds);
 	m_leds = NULL;
 
